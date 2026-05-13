@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Tracker Nawyków</title>
+    <style>
+        :root {
+            /* Paleta kolorów */
+            --bg-page: #0f172a;
+            --bg-container: #1e293b;
+            --bg-cell: #334155;
+            --bg-cell-hover: #3f516b;
+            --bg-input: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-orange: #fb923c;
+            --accent-purple: #a855f7;
+            --accent-yellow: #eab308;
+            --btn-red: #ef4444;
+            --btn-green: #22c55e;
+            --btn-gray: #475569;
+            --btn-hover: #64748b;
+            
+            /* Zaokrąglenia */
+            --radius-lg: 12px;
+            --radius-md: 6px;
+            --radius-sm: 4px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        /* Ukrycie strzałek we WSZYSTKICH polach numerycznych */
+        input[type="number"]::-webkit-outer-spin-button, 
+        input[type="number"]::-webkit-inner-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        
+        /* Styl dla input type="time" */
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        /* Wrapper główny - Układ 3 kolumnowy */
+        .wrapper {
+            display: flex;
+            gap: 15px;
+            width: 98vw;
+            max-width: 1750px;
+            height: 96vh; 
+        }
+
+        /* Lewa strona - Finanse i Ustawienia */
+        .left-sidebar {
+            width: 260px;
+            background-color: var(--bg-container);
+            padding: 15px;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        /* Środek - Kalendarz */
+        .app-container {
+            flex: 1; 
+            background-color: var(--bg-container);
+            padding: 15px 20px;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            min-height: 0; 
+        }
+
+        /* Prawa strona - Podsumowanie Nawyków */
+        .summary-container {
+            width: 300px;
+            background-color: var(--bg-container);
+            padding: 15px;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        /* Nagłówek i nawigacja */
+        .header-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px; 
+            margin-bottom: 10px; 
+        }
+
+        .main-title { font-size: 18px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        .month-navigation { display: flex; justify-content: space-between; align-items: center; width: 450px; }
+        .month-title { font-size: 18px; font-weight: bold; color: var(--accent-blue); width: 150px; text-align: center; }
+
+        /* Siatka kalendarza główna */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(6, minmax(0, 1fr)); 
+            gap: 8px; 
+            flex-grow: 1; 
+            min-height: 0; 
+        }
+
+        /* Komórka dnia */
+        .day-cell {
+            background-color: var(--bg-cell);
+            border-radius: var(--radius-md);
+            padding: 6px 8px; 
+            display: flex;
+            flex-direction: column;
+            border: 2px solid transparent;
+            transition: all 0.1s;
+            overflow: hidden; 
+            cursor: pointer;
+        }
+
+        .day-cell:hover:not(.empty) { background-color: var(--bg-cell-hover); }
+        .day-cell.today { border-color: var(--accent-blue); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+        .day-cell.empty { background-color: rgba(51, 65, 85, 0.3); border: 1px dashed rgba(148, 163, 184, 0.2); cursor: default; }
+
+        /* Nagłówek komórki */
+        .cell-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .cell-header-muted { font-size: 11px; color: var(--text-muted); width: 25px; }
+        .cell-header-day { font-size: 18px; font-weight: bold; text-align: center; flex-grow: 1; margin: 0; line-height: 1; }
+
+        /* NOWA SIATKA 2x2 DLA DANYCH W DNIU */
+        .day-stats-grid-2x2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 4px;
+            flex-grow: 1;
+        }
+
+        .stat-box-ro {
+            background: rgba(0, 0, 0, 0.25); border-radius: var(--radius-sm); padding: 0 4px; 
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            font-size: 13px; font-weight: bold; 
+        }
+        .stat-box-ro.sum-box { background: rgba(255, 255, 255, 0.05); font-size: 15px;}
+
+        /* Przyciski nawigacyjne i UI */
+        button { border: none; cursor: pointer; font-weight: bold; color: white; border-radius: var(--radius-sm); transition: all 0.2s; font-family: inherit; }
+        .btn-nav { padding: 6px 15px; background-color: var(--btn-gray); font-size: 12px; }
+        .btn-nav:hover { background-color: var(--btn-hover); }
+
+        .btn-io { padding: 8px; font-size: 11px; width: 100%; border-radius: var(--radius-sm); background-color: #2563eb; margin-top: 5px; }
+        .btn-io:hover { background-color: #1d4ed8; }
+        .btn-io.import { background-color: #059669; }
+        .btn-io.import:hover { background-color: #047857; }
+        
+        .btn-del-row { background: var(--btn-red); color: white; border-radius: 4px; width: 22px; height: 22px; font-size: 10px; display: flex; justify-content: center; align-items: center; padding: 0; }
+        .btn-del-row:hover { filter: brightness(1.2); }
+        
+        .btn-sign { width: 24px; height: 24px; border-radius: 4px; font-weight: bold; padding: 0; font-size: 14px; display: flex; justify-content: center; align-items: center; color: white; margin: 0 auto; }
+        .btn-sign:hover { filter: brightness(1.2); }
+
+        /* --- STYLIZACJA PODSUMOWANIA (Obie kolumny boczne) --- */
+        .summary-header { font-size: 15px; font-weight: bold; text-align: center; padding-bottom: 6px; border-bottom: 1px solid var(--bg-cell); color: var(--text-muted); margin-bottom: 5px;}
+        .summary-card { background-color: var(--bg-cell); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 4px; }
+        .summary-card-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .summary-value { font-size: 18px; font-weight: bold; text-align: right; }
+        .summary-subtext { font-size: 10px; color: var(--text-muted); text-align: right; }
+        .progress-bar-bg { width: 100%; height: 4px; background-color: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+        .progress-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+
+        /* ========================================= */
+        /* MODAL STYLES                              */
+        /* ========================================= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: var(--bg-container); padding: 20px; border-radius: var(--radius-lg);
+            width: 1200px; max-width: 98vw; max-height: 90vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8); position: relative;
+        }
+
+        .modal-close {
+            position: absolute; top: -10px; right: -10px;
+            background: var(--btn-red); border: none; color: white;
+            font-size: 16px; cursor: pointer; width: 30px; height: 30px; 
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
+        }
+        .modal-close:hover { filter: brightness(1.2); }
+
+        .modal-nav-wrapper {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--bg-cell); padding-bottom: 10px; margin-bottom: 15px;
+        }
+        .modal-title { font-size: 20px; font-weight: bold; color: var(--accent-blue); text-align: center; margin: 0; }
+        .modal-nav-btn {
+            background: var(--bg-cell); color: var(--text-main); font-size: 16px;
+            padding: 6px 12px; border-radius: var(--radius-sm);
+        }
+        .modal-nav-btn:hover:not(:disabled) { background: var(--accent-blue); }
+        .modal-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .modal-body { display: flex; gap: 20px; flex-grow: 1; overflow-y: hidden; }
+        .modal-col { display: flex; flex-direction: column; gap: 10px; height: 100%; overflow: hidden; }
+        
+        .modal-section-title { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;}
+
+        .modal-edit-row { display: flex; justify-content: space-between; align-items: center; background: var(--bg-cell); padding: 8px 12px; border-radius: var(--radius-md); }
+        .modal-edit-label { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;}
+        .modal-input {
+            background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); text-align: center; width: 85px; height: 26px; border-radius: 4px; outline: none; font-weight: bold; font-family: inherit; font-size: 13px;
+        }
+        .modal-input:focus { border-color: var(--accent-blue); }
+        
+        .btn-toggle-modal { width: 85px; height: 26px; font-size: 11px; border-radius: 4px; }
+        .btn-red { background-color: var(--btn-red); }
+        .btn-green { background-color: var(--btn-green); }
+
+        .btn-add-square {
+            width: 22px; height: 22px; background-color: var(--accent-blue); color: white; font-size: 16px; font-weight: bold; border-radius: 4px; display: flex; justify-content: center; align-items: center; line-height: 1; padding:0;
+        }
+        .btn-add-square:hover { filter: brightness(1.2); }
+
+        .data-table-container { background: var(--bg-cell); padding: 5px; border-radius: var(--radius-md); flex-grow: 1; overflow-y: auto; }
+        .exercises-table { width: 100%; border-collapse: collapse; }
+        .exercises-table th { text-align: left; padding: 4px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .exercises-table td { padding: 4px; }
+        .ex-input {
+            background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); width: 100%; height: 24px; border-radius: 4px; outline: none; font-family: inherit; font-size: 11px; padding: 0 5px;
+        }
+        .ex-input.num { text-align: center; }
+        .ex-input:focus { border-color: var(--accent-purple); }
+        select.ex-input { cursor: pointer; }
+
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        
+        <div class="left-sidebar">
+            <div class="summary-header">Podsumowanie Finansowe</div>
+            
+            <div class="summary-card" style="background-color: rgba(255,255,255,0.05); border: 1px solid var(--accent-blue);">
+                <div class="summary-card-title" style="color: var(--accent-blue)">Suma Kapitału (Miesiąc)</div>
+                <div class="summary-value" id="sum-total-month">0.00 PLN</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-title" style="color: var(--accent-green)">💵 Income (Miesiąc)</div>
+                <div class="summary-value" id="sum-income" style="color: var(--accent-green)">0.00 PLN</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-title" style="color: var(--accent-orange)">🛒 Outcome (Miesiąc)</div>
+                <div class="summary-value" id="sum-outcome" style="color: var(--accent-orange)">0.00 PLN</div>
+            </div>
+
+            <div class="summary-card" style="background-color: rgba(255,255,255,0.05); border: 1px solid var(--text-muted); margin-top: 10px;">
+                <div class="summary-card-title" style="color: var(--text-main)">⚖️ Bilans (Miesiąc)</div>
+                <div class="summary-value" id="sum-balance">0.00 PLN</div>
+            </div>
+
+            <div style="margin-top: auto;">
+                <button class="btn-io" style="background-color: var(--btn-gray);" onclick="otworzUstawienia()">⚙️ Ustawienia</button>
+            </div>
+        </div>
+
+        <div class="app-container">
+            <div class="header-section">
+                <div class="main-title">Dziennik Postępów</div>
+                <div class="month-navigation">
+                    <button class="btn-nav" onclick="zmienMiesiac(-1)">POPRZEDNI</button>
+                    <div id="nazwaMsc" class="month-title">Miesiąc</div>
+                    <button class="btn-nav" onclick="zmienMiesiac(1)">NASTĘPNY</button>
+                </div>
+            </div>
+
+            <div id="kalendarz-grid" class="calendar-grid">
+                </div>
+        </div>
+
+        <div class="summary-container">
+            <div class="summary-header">Statystyki Nawyków</div>
+
+            <div class="summary-card" style="background-color: rgba(255,255,255,0.05); border: 1px solid var(--accent-yellow);">
+                <div class="summary-card-title" style="color: var(--accent-yellow)">⭐ Suma Punktów</div>
+                <div class="summary-value" id="sum-month-points">0</div>
+                <div class="summary-subtext">Od 12.05.2026 do dziś</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-title" style="color: var(--accent-blue)">💧 Woda</div>
+                <div class="summary-value" id="sum-water">0 ml</div>
+                <div class="summary-subtext" id="sum-water-target">Cel: 0 ml</div>
+                <div class="progress-bar-bg">
+                    <div id="bar-water" class="progress-bar-fill" style="background-color: var(--accent-blue); width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-title" style="color: var(--accent-purple)">⚡ Kreatyna</div>
+                <div class="summary-value" id="sum-creatine">0 dni</div>
+                <div class="summary-subtext" id="sum-creatine-target">Z 0 dni w miesiącu</div>
+                <div class="progress-bar-bg">
+                    <div id="bar-creatine" class="progress-bar-fill" style="background-color: var(--accent-purple); width: 0%;"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 5px;">
+                <button class="btn-io" onclick="pobierzKopie()">📥 Pobierz Kopię Bazy (.json)</button>
+                <input type="file" id="import-file" style="display:none" accept=".json" onchange="wczytajKopiePlik(event)">
+                <button class="btn-io import" onclick="document.getElementById('import-file').click()">📤 Wczytaj Bazę z Pliku</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay" onclick="zamknijUstawieniaKlik(event)">
+        <div class="modal-content" style="width: 450px;" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="zamknijUstawienia()">✖</button>
+            <div class="modal-title" style="color: var(--text-main);">Ustawienia Systemu</div>
+            
+            <div class="modal-body" style="flex-direction: column; overflow: visible;">
+                <div class="modal-edit-row">
+                    <div class="modal-edit-label">💰 Dzienny Budżet</div>
+                    <input type="number" step="0.5" class="modal-input" id="settings-budget" onchange="zapiszUstawienia()">
+                </div>
+                
+                <div class="modal-edit-row">
+                    <div class="modal-edit-label">💧 Cel Wody</div>
+                    <input type="number" class="modal-input" id="settings-water" onchange="zapiszUstawienia()">
+                </div>
+
+                <div class="modal-edit-row">
+                    <div class="modal-edit-label">♟️ Cel Zadań Szachowych</div>
+                    <input type="number" class="modal-input" id="settings-chess" onchange="zapiszUstawienia()">
+                </div>
+
+                <div style="margin-top: 15px; background: var(--bg-cell); padding: 15px; border-radius: var(--radius-md);">
+                    <div class="modal-section-title" style="margin-bottom: 10px;">Dodaj nowe ćwiczenie do bazy</div>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" class="modal-input" style="flex-grow: 1; text-align: left; padding: 0 10px; width: auto;" id="settings-new-ex" placeholder="Wpisz nazwę ćwiczenia...">
+                        <button class="btn-toggle-modal btn-green" onclick="dodajDoBazyCwiczen()" style="width: 80px;">Dodaj</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay" onclick="zamknijModalKlikajacWTlo(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="zamknijModal()">✖</button>
+            
+            <div class="modal-nav-wrapper">
+                <button id="modal-prev-btn" class="modal-nav-btn" onclick="zmienDzienModalu(-1)">◀</button>
+                <div class="modal-title" id="modal-title">Szczegóły Dnia</div>
+                <button id="modal-next-btn" class="modal-nav-btn" onclick="zmienDzienModalu(1)">▶</button>
+            </div>
+            
+            <div class="modal-body">
+                
+                <div class="modal-col" style="flex: 0 0 250px;">
+                    <div class="modal-section-title">Podstawowe wskaźniki</div>
+                    
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--accent-yellow)">🌅 Wstanie</div>
+                        <input type="time" class="modal-input" id="modal-wstanie" style="width: 95px;" onchange="aktualizujPoleTekstoweZModalu('wstanie', this.value)">
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--accent-purple)">🌙 Spać</div>
+                        <input type="time" class="modal-input" id="modal-spac" style="width: 95px;" onchange="aktualizujPoleTekstoweZModalu('spac', this.value)">
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--accent-blue)">💧 Woda (ml)</div>
+                        <input type="number" class="modal-input" id="modal-woda" oninput="aktualizujPoleZModalu('wypitaWoda', this.value)">
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--text-muted)">⚡ Kreatyna</div>
+                        <button id="modal-kreatyna-btn" class="btn-toggle-modal" onclick="zmienKreatyneZModalu()">NIE</button>
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: #cbd5e1">♟️ Ranking chess</div>
+                        <div style="font-size: 14px; font-weight: bold;" id="modal-chess-ranking">0</div>
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--accent-yellow)">⭐ Day Points</div>
+                        <div style="font-size: 16px; font-weight: bold;" id="modal-day-points">0</div>
+                    </div>
+
+                    <div class="modal-edit-row" style="margin-top: 10px;">
+                        <div class="modal-edit-label" style="color: var(--accent-green)">💵 Income</div>
+                        <div style="font-size: 14px; font-weight: bold; color: var(--accent-green);" id="modal-income">0.00</div>
+                    </div>
+
+                    <div class="modal-edit-row">
+                        <div class="modal-edit-label" style="color: var(--accent-orange)">🛒 Outcome</div>
+                        <div style="font-size: 14px; font-weight: bold; color: var(--accent-orange);" id="modal-outcome">0.00</div>
+                    </div>
+
+                    <div class="modal-edit-row" style="background: rgba(255,255,255,0.05); border: 1px solid var(--bg-cell); margin-top: auto;">
+                        <div class="modal-edit-label">Aktualna Suma Dnia</div>
+                        <div style="font-size: 18px; font-weight: bold;" id="modal-sum">0.00</div>
+                    </div>
+                </div>
+
+                <div style="flex: 1; display: flex; gap: 15px; overflow: hidden;">
+                    
+                    <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                        <div class="modal-section-title" style="color: var(--accent-purple)">
+                            Ćwiczenia
+                            <button class="btn-add-square" style="background-color: var(--accent-purple);" onclick="dodajCwiczenie()">+</button>
+                        </div>
+                        <div class="data-table-container">
+                            <table class="exercises-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45%;">Nazwa</th>
+                                        <th style="width: 20%; text-align: center;">Ilość</th>
+                                        <th style="width: 20%; text-align: center;">Masa</th>
+                                        <th style="width: 15%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modal-cwiczenia-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                        <div class="modal-section-title" style="color: var(--accent-orange)">
+                            Transakcje
+                            <button class="btn-add-square" style="background-color: var(--accent-orange)" onclick="dodajTransakcje()">+</button>
+                        </div>
+                        <div class="data-table-container">
+                            <table class="exercises-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45%;">Tytuł Transakcji</th>
+                                        <th style="width: 15%; text-align: center;">Typ</th>
+                                        <th style="width: 25%; text-align: center;">Kwota</th>
+                                        <th style="width: 15%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modal-transakcje-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                        <div class="modal-section-title" style="color: #cbd5e1">
+                            Zad. Szachowe
+                            <button class="btn-add-square" style="background-color: #cbd5e1; color: #000;" onclick="dodajSzachy()">+</button>
+                        </div>
+                        <div class="data-table-container">
+                            <table class="exercises-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50%;">Zadanie</th>
+                                        <th style="width: 35%; text-align: center;">Elo</th>
+                                        <th style="width: 15%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modal-szachy-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let db = { 
+        configuration: { year: null, weekDay: null, day: null, dailyBudget: 30, waterTarget: 2000, chessTarget: 5 }, 
+        dni: [],
+        base: [
+            { id: 1, nazwaCwiczenia: "Wyciskanie sztangi leżąc" },
+            { id: 2, nazwaCwiczenia: "Martwy ciąg" },
+            { id: 3, nazwaCwiczenia: "Przysiad ze sztangą" },
+            { id: 4, nazwaCwiczenia: "Wyciskanie żołnierskie" },
+            { id: 5, nazwaCwiczenia: "Podciąganie na drążku" },
+            { id: 6, nazwaCwiczenia: "Wiosłowanie sztangą" }
+        ]
+    };
+    
+    let aktualnyRokOgladany, aktualnyMiesiacOgladany;
+    const nazwyMiesiecy = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+
+    let aktualnieEdytowanyDzienId = null; 
+
+    function pobierzKopie() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 4));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", "dziennik_kopia_" + new Date().toLocaleDateString() + ".json");
+        document.body.appendChild(dlAnchorElem);
+        dlAnchorElem.click();
+        dlAnchorElem.remove();
+    }
+
+    function wczytajKopiePlik(event) {
+        const plik = event.target.files[0];
+        if (!plik) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const wczytanaBaza = JSON.parse(e.target.result);
+                if (wczytanaBaza && wczytanaBaza.dni) {
+                    db = wczytanaBaza;
+                    
+                    if(!db.base) {
+                        db.base = [
+                            { id: 1, nazwaCwiczenia: "Wyciskanie sztangi leżąc" },
+                            { id: 2, nazwaCwiczenia: "Martwy ciąg" },
+                            { id: 3, nazwaCwiczenia: "Przysiad ze sztangą" }
+                        ];
+                    }
+                    if(!db.configuration.dailyBudget) db.configuration.dailyBudget = 30;
+                    if(!db.configuration.waterTarget) db.configuration.waterTarget = 2000;
+                    if(!db.configuration.chessTarget) db.configuration.chessTarget = 5;
+
+                    zapiszDoBazy();
+                    alert("✅ Baza wczytana pomyślnie!");
+                    inicjalizujAplikacje(); 
+                } else {
+                    alert("❌ Nieprawidłowa struktura pliku!");
+                }
+            } catch (err) {
+                alert("❌ Błąd przetwarzania pliku JSON!");
+            }
+        };
+        reader.readAsText(plik);
+        event.target.value = ''; 
+    }
+
+    function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+        var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+        return Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+    }
+    function getDzienTygodnia(date) { let day = date.getDay(); return day === 0 ? 7 : day; }
+    function getDayOfYear(date) { return Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000); }
+
+    function zapiszDoBazy() { localStorage.setItem('BazaTrackera', JSON.stringify(db)); }
+    
+    function wczytajZBazy() {
+        const zapis = localStorage.getItem('BazaTrackera');
+        if (zapis) { 
+            db = JSON.parse(zapis); 
+            db.dni.forEach(dzien => {
+                if(dzien.income === undefined) dzien.income = 0;
+                if(dzien.outcome === undefined) dzien.outcome = 0;
+                if(dzien.cwiczenia === undefined) dzien.cwiczenia = [];
+                if(dzien.transakcje === undefined) dzien.transakcje = [];
+                if(dzien.chessList === undefined) dzien.chessList = [];
+                if(dzien.dayPoints === undefined) dzien.dayPoints = 0;
+                if(dzien.wstanie === undefined) dzien.wstanie = '';
+                if(dzien.spac === undefined) dzien.spac = '';
+            });
+
+            if(!db.base) {
+                db.base = [
+                    { id: 1, nazwaCwiczenia: "Wyciskanie sztangi leżąc" },
+                    { id: 2, nazwaCwiczenia: "Martwy ciąg" },
+                    { id: 3, nazwaCwiczenia: "Przysiad ze sztangą" }
+                ];
+            }
+            if(!db.configuration.dailyBudget) db.configuration.dailyBudget = 30;
+            if(!db.configuration.waterTarget) db.configuration.waterTarget = 2000;
+            if(!db.configuration.chessTarget) db.configuration.chessTarget = 5;
+
+            return true; 
+        } 
+        return false;
+    }
+
+    function inicjalizujAplikacje() {
+        const dzisiaj = new Date();
+        const rok = dzisiaj.getFullYear();
+        if (!wczytajZBazy()) {
+            db.configuration = { year: rok, weekDay: getDzienTygodnia(dzisiaj), day: getDayOfYear(dzisiaj), dailyBudget: 30, waterTarget: 2000, chessTarget: 5 };
+            generujRok(rok);
+        } else {
+            db.configuration.year = rok;
+            db.configuration.weekDay = getDzienTygodnia(dzisiaj);
+            db.configuration.day = getDayOfYear(dzisiaj);
+            zapiszDoBazy();
+        }
+        aktualnyRokOgladany = dzisiaj.getFullYear();
+        aktualnyMiesiacOgladany = dzisiaj.getMonth();
+        renderujKalendarz();
+    }
+
+    function generujRok(rok) {
+        let dataBiezaca = new Date(rok, 0, 1);
+        let idCounter = db.dni.length > 0 ? Math.max(...db.dni.map(d => d.id)) + 1 : 1;
+        while (dataBiezaca.getFullYear() === rok) {
+            db.dni.push({
+                id: idCounter++, nrRoku: rok, nrMiesiaca: dataBiezaca.getMonth() + 1,
+                nrTygodnia: getWeekNumber(dataBiezaca), nrDnia: dataBiezaca.getDate(),
+                celWody: 2000, wypitaWoda: 0, 
+                income: 0, outcome: 0,
+                kreatyna: 0, cwiczenia: [], transakcje: [], chessList: [], dayPoints: 0,
+                wstanie: '', spac: ''
+            });
+            dataBiezaca.setDate(dataBiezaca.getDate() + 1);
+        }
+        zapiszDoBazy();
+    }
+
+    function zmienMiesiac(kierunek) {
+        aktualnyMiesiacOgladany += kierunek;
+        if (aktualnyMiesiacOgladany > 11) {
+            aktualnyMiesiacOgladany = 0; aktualnyRokOgladany++;
+            if(!db.dni.some(d => d.nrRoku === aktualnyRokOgladany)) generujRok(aktualnyRokOgladany);
+        } else if (aktualnyMiesiacOgladany < 0) {
+            aktualnyMiesiacOgladany = 11; aktualnyRokOgladany--;
+            if(!db.dni.some(d => d.nrRoku === aktualnyRokOgladany)) {
+                let stareDni = db.dni; db.dni = []; generujRok(aktualnyRokOgladany); db.dni = db.dni.concat(stareDni);
+            }
+        }
+        renderujKalendarz();
+    }
+
+    /* ========================================== */
+    /* KALKULACJE BIZNESOWE                       */
+    /* ========================================== */
+
+    function pobierzKolorWody(woda) {
+        let cel = parseFloat(db.configuration.waterTarget) || 2000;
+        if (woda < cel * 0.5) return 'var(--btn-red)';
+        if (woda < cel) return 'var(--accent-yellow)';
+        return 'var(--accent-green)';
+    }
+
+    function przeliczFinanseDnia(rekord) {
+        let inc = 0;
+        let out = 0;
+        (rekord.transakcje || []).forEach(t => {
+            let k = Math.abs(parseFloat(t.kwota) || 0);
+            let isInc = t.isIncome !== undefined ? t.isIncome : (parseFloat(t.kwota) >= 0);
+            if (isInc) inc += k;
+            else out += k;
+        });
+        rekord.income = inc;
+        rekord.outcome = out;
+    }
+
+    function obliczSumeDnia(daneDnia) {
+        let cellDate = new Date(daneDnia.nrRoku, daneDnia.nrMiesiaca - 1, daneDnia.nrDnia);
+        let limitDate = new Date(2026, 4, 8); 
+        let budget = parseFloat(db.configuration.dailyBudget) || 30;
+        
+        if (cellDate < limitDate) return 0; 
+
+        let dniMiesiaca = db.dni.filter(d => d.nrRoku === daneDnia.nrRoku && d.nrMiesiaca === daneDnia.nrMiesiaca);
+        let outcomeP = 0;
+
+        if (daneDnia.nrRoku === 2026 && daneDnia.nrMiesiaca === 5) {
+            outcomeP = dniMiesiaca
+                .filter(d => d.nrDnia >= 8 && d.nrDnia <= daneDnia.nrDnia)
+                .reduce((acc, d) => acc + (parseFloat(d.outcome) || 0), 0);
+            return ((daneDnia.nrDnia - 7) * budget) - outcomeP;
+        } 
+        else {
+            outcomeP = dniMiesiaca
+                .filter(d => d.nrDnia <= daneDnia.nrDnia)
+                .reduce((acc, d) => acc + (parseFloat(d.outcome) || 0), 0);
+            return (daneDnia.nrDnia * budget) - outcomeP;
+        }
+    }
+
+    function przeliczPunktyDnia(rekord) {
+        let cellDate = new Date(rekord.nrRoku, rekord.nrMiesiaca - 1, rekord.nrDnia);
+        let limitDate = new Date(2026, 4, 12); // PUNKTY OD 12.05.2026
+        
+        if (cellDate < limitDate) {
+            rekord.dayPoints = 0;
+        } else {
+            let pts = 0;
+            
+            // WODA
+            let woda = parseFloat(rekord.wypitaWoda) || 0;
+            let targetWoda = parseFloat(db.configuration.waterTarget) || 2000;
+            if (woda < targetWoda * 0.5) pts -= 8;
+            else if (woda >= targetWoda * 0.5 && woda < targetWoda) pts += 2;
+            else if (woda >= targetWoda) pts += 7; 
+            
+            // KREATYNA
+            if (rekord.kreatyna === 1) pts += 1;
+            else pts -= 2;
+
+            // SZACHY
+            let chessCount = (rekord.chessList || []).length;
+            let chessTarget = parseFloat(db.configuration.chessTarget) || 5;
+            if (chessCount >= chessTarget) pts += 4;
+            else pts -= 6;
+
+            rekord.dayPoints = pts;
+        }
+    }
+
+    /* ========================================== */
+    /* LOGIKA USTAWIEŃ                            */
+    /* ========================================== */
+
+    function otworzUstawienia() {
+        document.getElementById('settings-budget').value = db.configuration.dailyBudget || 30;
+        document.getElementById('settings-water').value = db.configuration.waterTarget || 2000;
+        document.getElementById('settings-chess').value = db.configuration.chessTarget || 5;
+        document.getElementById('modal-settings').style.display = 'flex';
+    }
+
+    function zamknijUstawienia() {
+        document.getElementById('modal-settings').style.display = 'none';
+    }
+
+    function zamknijUstawieniaKlik(event) {
+        if(event.target.id === 'modal-settings') zamknijUstawienia();
+    }
+
+    function zapiszUstawienia() {
+        db.configuration.dailyBudget = parseFloat(document.getElementById('settings-budget').value) || 0;
+        db.configuration.waterTarget = parseFloat(document.getElementById('settings-water').value) || 0;
+        db.configuration.chessTarget = parseFloat(document.getElementById('settings-chess').value) || 0;
+        
+        db.dni.forEach(d => przeliczPunktyDnia(d)); 
+        
+        zapiszDoBazy();
+        renderujKalendarz();
+        if(aktualnieEdytowanyDzienId) odswiezWskaznikiWModalu();
+    }
+
+    function dodajDoBazyCwiczen() {
+        let input = document.getElementById('settings-new-ex');
+        let nazwa = input.value.trim();
+        if(nazwa) {
+            let maxId = db.base.length > 0 ? Math.max(...db.base.map(b => b.id)) : 0;
+            db.base.push({id: maxId + 1, nazwaCwiczenia: nazwa});
+            zapiszDoBazy();
+            input.value = '';
+            alert("Dodano ćwiczenie do bazy!");
+            if(aktualnieEdytowanyDzienId) renderujCwiczenia();
+        }
+    }
+
+    /* ========================================== */
+    /* LOGIKA MODALU DNIA                         */
+    /* ========================================== */
+
+    function otworzModal(idDnia) {
+        aktualnieEdytowanyDzienId = idDnia;
+        let daneDnia = db.dni.find(d => d.id === idDnia);
+        
+        document.getElementById('modal-title').innerText = `${daneDnia.nrDnia} ${nazwyMiesiecy[daneDnia.nrMiesiaca - 1]} ${daneDnia.nrRoku} (T${daneDnia.nrTygodnia})`;
+        
+        let wodaEl = document.getElementById('modal-woda');
+        wodaEl.value = daneDnia.wypitaWoda;
+        
+        document.getElementById('modal-wstanie').value = daneDnia.wstanie || '';
+        document.getElementById('modal-spac').value = daneDnia.spac || '';
+        
+        odswiezWskaznikiWModalu();
+
+        let indexDnia = db.dni.findIndex(d => d.id === idDnia);
+        document.getElementById('modal-prev-btn').disabled = (indexDnia <= 0);
+        document.getElementById('modal-next-btn').disabled = (indexDnia >= db.dni.length - 1);
+
+        renderujCwiczenia();
+        renderujTransakcje();
+        renderujSzachy();
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    function zamknijModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+        aktualnieEdytowanyDzienId = null;
+        renderujKalendarz(); 
+    }
+
+    function zamknijModalKlikajacWTlo(event) {
+        if(event.target.id === 'modal-overlay') {
+            zamknijModal();
+        }
+    }
+
+    function zmienDzienModalu(kierunek) {
+        if(!aktualnieEdytowanyDzienId) return;
+        let currentIndex = db.dni.findIndex(d => d.id === aktualnieEdytowanyDzienId);
+        let nextIndex = currentIndex + kierunek;
+        if (nextIndex >= 0 && nextIndex < db.dni.length) {
+            otworzModal(db.dni[nextIndex].id);
+        }
+    }
+
+    function aktualizujPoleZModalu(pole, wartosc) {
+        if(!aktualnieEdytowanyDzienId) return;
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord[pole] = parseFloat(wartosc) || 0;
+        odswiezWskaznikiWModalu();
+    }
+
+    function aktualizujPoleTekstoweZModalu(pole, wartosc) {
+        if(!aktualnieEdytowanyDzienId) return;
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord[pole] = wartosc;
+        zapiszDoBazy();
+    }
+
+    function zmienKreatyneZModalu() {
+        if(!aktualnieEdytowanyDzienId) return;
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.kreatyna = rekord.kreatyna === 0 ? 1 : 0;
+        odswiezWskaznikiWModalu();
+    }
+
+    function odswiezWskaznikiWModalu() {
+        if(!aktualnieEdytowanyDzienId) return;
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        
+        // 1. Aktualizacja Wody UI
+        document.getElementById('modal-woda').style.color = pobierzKolorWody(parseFloat(rekord.wypitaWoda) || 0);
+
+        // 2. Kreatyna UI
+        let kreaBtn = document.getElementById('modal-kreatyna-btn');
+        if(rekord.kreatyna === 1) {
+            kreaBtn.className = 'btn-toggle-modal btn-green';
+            kreaBtn.innerText = 'TAK';
+        } else {
+            kreaBtn.className = 'btn-toggle-modal btn-red';
+            kreaBtn.innerText = 'NIE';
+        }
+
+        // 3. Finanse UI
+        przeliczFinanseDnia(rekord);
+        document.getElementById('modal-income').innerText = rekord.income.toFixed(2);
+        document.getElementById('modal-outcome').innerText = rekord.outcome.toFixed(2);
+        
+        let suma = obliczSumeDnia(rekord);
+        let sumEl = document.getElementById('modal-sum');
+        sumEl.innerText = suma.toFixed(2);
+        if (suma > 0) sumEl.style.color = "var(--accent-green)";
+        else if (suma < 0) sumEl.style.color = "var(--btn-red)";
+        else sumEl.style.color = "var(--text-main)";
+
+        // 4. Szachy Ranking UI
+        let totalElo = (rekord.chessList || []).reduce((acc, ch) => acc + (parseFloat(ch.elo)||0), 0);
+        document.getElementById('modal-chess-ranking').innerText = totalElo;
+
+        // 5. Day Points UI
+        przeliczPunktyDnia(rekord);
+        let ptsEl = document.getElementById('modal-day-points');
+        ptsEl.innerText = rekord.dayPoints;
+        if (rekord.dayPoints > 0) ptsEl.style.color = "var(--accent-green)";
+        else if (rekord.dayPoints < 0) ptsEl.style.color = "var(--btn-red)";
+        else ptsEl.style.color = "var(--text-main)";
+
+        zapiszDoBazy();
+    }
+
+    /* --- Listy w Modalu (Ćwiczenia, Transakcje, Szachy) --- */
+    
+    // Ćwiczenia
+    function renderujCwiczenia() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let tbody = document.getElementById('modal-cwiczenia-body');
+        tbody.innerHTML = '';
+        if(!rekord.cwiczenia) rekord.cwiczenia = [];
+
+        rekord.cwiczenia.forEach((cw, index) => {
+            let tr = document.createElement('tr');
+            let optionsHTML = `<option value="">-- Wybierz --</option>`;
+            db.base.forEach(bazaCw => {
+                let isSelected = (cw.nazwa === bazaCw.nazwaCwiczenia) ? 'selected' : '';
+                optionsHTML += `<option value="${bazaCw.nazwaCwiczenia}" ${isSelected}>${bazaCw.nazwaCwiczenia}</option>`;
+            });
+
+            tr.innerHTML = `
+                <td><select class="ex-input" onchange="aktualizujCwiczenie(${index}, 'nazwa', this.value)">${optionsHTML}</select></td>
+                <td><input type="number" step="0.5" class="ex-input num" value="${cw.ilosc || 0}" oninput="aktualizujCwiczenie(${index}, 'ilosc', this.value)"></td>
+                <td><input type="number" step="0.5" class="ex-input num" value="${cw.obciazenie || 0}" oninput="aktualizujCwiczenie(${index}, 'obciazenie', this.value)"></td>
+                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunCwiczenie(${index})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    function dodajCwiczenie() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.cwiczenia.push({ nazwa: '', ilosc: 0, obciazenie: 0 });
+        zapiszDoBazy(); renderujCwiczenia();
+    }
+    function aktualizujCwiczenie(index, pole, wartosc) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        if(pole === 'nazwa') rekord.cwiczenia[index][pole] = wartosc;
+        else rekord.cwiczenia[index][pole] = parseFloat(wartosc) || 0;
+        zapiszDoBazy();
+    }
+    function usunCwiczenie(index) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.cwiczenia.splice(index, 1);
+        zapiszDoBazy(); renderujCwiczenia();
+    }
+
+    // Transakcje
+    function renderujTransakcje() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let tbody = document.getElementById('modal-transakcje-body');
+        tbody.innerHTML = '';
+        if(!rekord.transakcje) rekord.transakcje = [];
+
+        rekord.transakcje.forEach((t, index) => {
+            if (t.isIncome === undefined) t.isIncome = (parseFloat(t.kwota) >= 0);
+            let k = Math.abs(parseFloat(t.kwota) || 0);
+
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="ex-input" value="${t.tytul || ''}" oninput="aktualizujTransakcje(${index}, 'tytul', this.value)"></td>
+                <td style="text-align: center;"><button class="btn-sign ${t.isIncome ? 'btn-green' : 'btn-red'}" onclick="zmienTypTransakcji(${index})">${t.isIncome ? '+' : '-'}</button></td>
+                <td><input type="number" step="0.01" min="0" class="ex-input num" value="${k}" oninput="aktualizujTransakcje(${index}, 'kwota', this.value)"></td>
+                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunTransakcje(${index})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    function dodajTransakcje() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let maxId = rekord.transakcje.length > 0 ? Math.max(...rekord.transakcje.map(t=>t.id||0)) : 0;
+        rekord.transakcje.push({ id: maxId+1, tytul: 'transakcja', kwota: 0, isIncome: false });
+        zapiszDoBazy(); renderujTransakcje(); odswiezWskaznikiWModalu();
+    }
+    function zmienTypTransakcji(index) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        if (rekord.transakcje[index].isIncome === undefined) {
+            rekord.transakcje[index].isIncome = (parseFloat(rekord.transakcje[index].kwota) >= 0);
+        }
+        rekord.transakcje[index].isIncome = !rekord.transakcje[index].isIncome;
+        odswiezWskaznikiWModalu();
+        renderujTransakcje();
+    }
+    function aktualizujTransakcje(index, pole, wartosc) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        if(pole === 'kwota') rekord.transakcje[index][pole] = Math.abs(parseFloat(wartosc) || 0);
+        else rekord.transakcje[index][pole] = wartosc;
+        odswiezWskaznikiWModalu();
+    }
+    function usunTransakcje(index) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.transakcje.splice(index, 1);
+        zapiszDoBazy(); renderujTransakcje(); odswiezWskaznikiWModalu();
+    }
+
+    // Szachy
+    function renderujSzachy() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let tbody = document.getElementById('modal-szachy-body');
+        tbody.innerHTML = '';
+        if(!rekord.chessList) rekord.chessList = [];
+
+        rekord.chessList.forEach((ch, index) => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-size: 11px; color: var(--text-main);">Zadanie ${index + 1}</td>
+                <td><input type="number" class="ex-input num" value="${ch.elo || 0}" oninput="aktualizujSzachy(${index}, this.value)"></td>
+                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunSzachy(${index})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    function dodajSzachy() {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.chessList.push({ elo: 0 });
+        zapiszDoBazy(); renderujSzachy(); odswiezWskaznikiWModalu();
+    }
+    function aktualizujSzachy(index, wartosc) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.chessList[index].elo = parseFloat(wartosc) || 0;
+        odswiezWskaznikiWModalu();
+    }
+    function usunSzachy(index) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.chessList.splice(index, 1);
+        zapiszDoBazy(); renderujSzachy(); odswiezWskaznikiWModalu();
+    }
+
+    /* ========================================== */
+    /* RENDEROWANIE GŁÓWNE KALENDARZA             */
+    /* ========================================== */
+
+    function renderujKalendarz() {
+        document.getElementById('nazwaMsc').innerText = `${nazwyMiesiecy[aktualnyMiesiacOgladany]} ${aktualnyRokOgladany}`;
+        const grid = document.getElementById('kalendarz-grid');
+        grid.innerHTML = ''; 
+
+        let dniMiesiaca = db.dni.filter(d => d.nrRoku === aktualnyRokOgladany && d.nrMiesiaca === (aktualnyMiesiacOgladany + 1));
+        let pierwszyDzienTygodnia = getDzienTygodnia(new Date(aktualnyRokOgladany, aktualnyMiesiacOgladany, 1));
+        let przesuniecie = pierwszyDzienTygodnia - 1; 
+
+        for (let i = 0; i < 42; i++) {
+            let komorka = document.createElement('div');
+            
+            if (i < przesuniecie || i >= przesuniecie + dniMiesiaca.length) {
+                komorka.className = 'day-cell empty';
+                grid.appendChild(komorka);
+                continue;
+            }
+
+            let daneDnia = dniMiesiaca[i - przesuniecie];
+            komorka.className = 'day-cell';
+            
+            let dzisiaj = new Date();
+            if(daneDnia.nrRoku === dzisiaj.getFullYear() && daneDnia.nrDnia === dzisiaj.getDate() && daneDnia.nrMiesiaca === (dzisiaj.getMonth()+1)) {
+                komorka.classList.add('today');
+            }
+
+            komorka.onclick = () => otworzModal(daneDnia.id);
+
+            let sumaDnia = obliczSumeDnia(daneDnia);
+            let sumaColor = sumaDnia > 0 ? 'var(--accent-green)' : (sumaDnia < 0 ? 'var(--btn-red)' : 'var(--text-main)');
+            
+            let wodaColor = pobierzKolorWody(daneDnia.wypitaWoda);
+            let valKoszyk = (parseFloat(daneDnia.income) || 0) - (parseFloat(daneDnia.outcome) || 0);
+            let koszykColor = valKoszyk > 0 ? 'var(--accent-green)' : (valKoszyk < 0 ? 'var(--btn-red)' : 'var(--text-muted)');
+            
+            let kreatynaText = daneDnia.kreatyna === 1 ? 'TAK' : 'NIE';
+            let kreatynaColor = daneDnia.kreatyna === 1 ? 'var(--accent-green)' : 'var(--btn-red)';
+
+            komorka.innerHTML = `
+                <div class="cell-header">
+                    <span class="cell-header-muted">#${daneDnia.id}</span>
+                    <span class="cell-header-day">${daneDnia.nrDnia}</span>
+                    <span class="cell-header-muted" style="text-align: right;">T${daneDnia.nrTygodnia}</span>
+                </div>
+                
+                <div class="day-stats-grid-2x2">
+                    <div class="stat-box-ro" style="color: ${wodaColor}">
+                        💧 ${daneDnia.wypitaWoda}
+                    </div>
+                    <div class="stat-box-ro" style="color: ${kreatynaColor}">
+                        ⚡ ${kreatynaText}
+                    </div>
+                    <div class="stat-box-ro" style="color: ${koszykColor}">
+                        🛒 ${valKoszyk.toFixed(2)}
+                    </div>
+                    <div class="stat-box-ro sum-box" style="color: ${sumaColor}">
+                        ${sumaDnia.toFixed(2)}
+                    </div>
+                </div>
+            `;
+            grid.appendChild(komorka);
+        }
+        
+        aktualizujPodsumowanie();
+    }
+
+    function aktualizujPodsumowanie() {
+        let dniMiesiaca = db.dni.filter(d => d.nrRoku === aktualnyRokOgladany && d.nrMiesiaca === (aktualnyMiesiacOgladany + 1));
+        
+        let wodaSuma = 0;
+        let incomeTotalMiesiac = 0;
+        let outcomeTotalMiesiac = 0;
+        let kreaSuma = 0, dniWMiesiacu = dniMiesiaca.length;
+        let pointsTotalMiesiac = 0;
+
+        let limitDatePts = new Date(2026, 4, 12);
+        limitDatePts.setHours(0,0,0,0);
+        
+        let dzisiajDate = new Date();
+        dzisiajDate.setHours(0,0,0,0);
+
+        dniMiesiaca.forEach(d => {
+            wodaSuma += parseFloat(d.wypitaWoda) || 0;
+            incomeTotalMiesiac += parseFloat(d.income) || 0;
+            
+            if(d.nrRoku === 2026 && d.nrMiesiaca === 5) {
+                if(d.nrDnia >= 8) outcomeTotalMiesiac += parseFloat(d.outcome) || 0;
+            } else {
+                outcomeTotalMiesiac += parseFloat(d.outcome) || 0;
+            }
+
+            if (d.kreatyna === 1) kreaSuma++;
+
+            przeliczPunktyDnia(d); 
+            
+            // Logika sumowania punktów tylko od 12.05.2026 do dziś
+            let cellDate = new Date(d.nrRoku, d.nrMiesiaca - 1, d.nrDnia);
+            cellDate.setHours(0,0,0,0);
+            
+            if (cellDate >= limitDatePts && cellDate <= dzisiajDate) {
+                pointsTotalMiesiac += d.dayPoints;
+            }
+        });
+
+        let targetWodaGl = parseFloat(db.configuration.waterTarget) || 2000;
+        let wodaCel = dniWMiesiacu * targetWodaGl;
+
+        // 1. Podsumowanie Punktów (Right Panel)
+        let sumPointsEl = document.getElementById('sum-month-points');
+        sumPointsEl.innerText = pointsTotalMiesiac;
+        if (pointsTotalMiesiac > 0) sumPointsEl.style.color = "var(--accent-green)";
+        else if (pointsTotalMiesiac < 0) sumPointsEl.style.color = "var(--btn-red)";
+        else sumPointsEl.style.color = "var(--text-main)";
+        
+        document.getElementById('sum-water').innerText = `${wodaSuma} ml`;
+        document.getElementById('sum-water-target').innerText = `Cel: ${wodaCel} ml`;
+        let procWoda = wodaCel > 0 ? Math.min((wodaSuma / wodaCel) * 100, 100) : 0;
+        document.getElementById('bar-water').style.width = `${procWoda}%`;
+
+        document.getElementById('sum-creatine').innerText = `${kreaSuma} dni`;
+        document.getElementById('sum-creatine-target').innerText = `Z ${dniWMiesiacu} dni w miesiącu`;
+        let procKrea = dniWMiesiacu > 0 ? (kreaSuma / dniWMiesiacu) * 100 : 0;
+        document.getElementById('bar-creatine').style.width = `${procKrea}%`;
+
+        // 2. Podsumowanie Finansowe (Left Panel) 
+        let sumTotalMonth = 0;
+        let ostatniDzien = dniMiesiaca[dniMiesiaca.length - 1];
+        if (ostatniDzien) sumTotalMonth = obliczSumeDnia(ostatniDzien);
+        
+        let sumTotalEl = document.getElementById('sum-total-month');
+        sumTotalEl.innerText = `${sumTotalMonth.toFixed(2)} PLN`;
+        if (sumTotalMonth > 0) sumTotalEl.style.color = "var(--accent-green)";
+        else if (sumTotalMonth < 0) sumTotalEl.style.color = "var(--btn-red)";
+        else sumTotalEl.style.color = "var(--text-main)";
+
+        document.getElementById('sum-income').innerText = `${incomeTotalMiesiac.toFixed(2)} PLN`;
+        document.getElementById('sum-outcome').innerText = `${outcomeTotalMiesiac.toFixed(2)} PLN`;
+
+        let bilansMiesiaca = incomeTotalMiesiac - outcomeTotalMiesiac;
+        let bilansElement = document.getElementById('sum-balance');
+        bilansElement.innerText = `${bilansMiesiaca.toFixed(2)} PLN`;
+        
+        if (bilansMiesiaca > 0) bilansElement.style.color = "var(--accent-green)";
+        else if (bilansMiesiaca < 0) bilansElement.style.color = "var(--btn-red)";
+        else bilansElement.style.color = "var(--text-main)";
+    }
+
+    window.onload = inicjalizujAplikacje;
+
+</script>
+</body>
+</html>

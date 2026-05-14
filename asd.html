@@ -469,9 +469,9 @@
                             <table class="exercises-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 45%;">Tytuł Transakcji</th>
-                                        <th style="width: 15%; text-align: center;">Typ</th>
-                                        <th style="width: 25%; text-align: center;">Kwota</th>
+                                        <th style="width: 12%; text-align: center;"></th>
+                                        <th style="width: 48%;">Tytuł Transakcji</th>
+                                        <th style="width: 25%; text-align: center;">Suma</th>
                                         <th style="width: 15%;"></th>
                                     </tr>
                                 </thead>
@@ -674,10 +674,19 @@
         let inc = 0;
         let out = 0;
         (rekord.transakcje || []).forEach(t => {
-            let k = Math.abs(parseFloat(t.kwota) || 0);
-            let isInc = t.isIncome !== undefined ? t.isIncome : (parseFloat(t.kwota) >= 0);
-            if (isInc) inc += k;
-            else out += k;
+            if (t.szczegoly) {
+                t.szczegoly.forEach(sz => {
+                    let k = Math.abs(parseFloat(sz.kwota) || 0);
+                    if (sz.isIncome) inc += k;
+                    else out += k;
+                });
+            } else {
+                // Kompatybilność ze starszymi wpisami
+                let k = Math.abs(parseFloat(t.kwota) || 0);
+                let isInc = t.isIncome !== undefined ? t.isIncome : (parseFloat(t.kwota) >= 0);
+                if (isInc) inc += k;
+                else out += k;
+            }
         });
         rekord.income = inc;
         rekord.outcome = out;
@@ -939,6 +948,15 @@
     }
 
     // Transakcje
+    const domyslneSzczegolyTransakcji = () => [
+        { ikona: '💵', kwota: 0, isIncome: false },
+        { ikona: '💧', kwota: 0, isIncome: false },
+        { ikona: '🍞', kwota: 0, isIncome: false },
+        { ikona: '🥤', kwota: 0, isIncome: false },
+        { ikona: '🍫', kwota: 0, isIncome: false },
+        { ikona: '🪥', kwota: 0, isIncome: false }
+    ];
+
     function renderujTransakcje() {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
         let tbody = document.getElementById('modal-transakcje-body');
@@ -946,39 +964,83 @@
         if(!rekord.transakcje) rekord.transakcje = [];
 
         rekord.transakcje.forEach((t, index) => {
-            if (t.isIncome === undefined) t.isIncome = (parseFloat(t.kwota) >= 0);
-            let k = Math.abs(parseFloat(t.kwota) || 0);
+            // Inicjalizacja szczegółów dla starszych wpisów
+            if (!t.szczegoly) {
+                t.szczegoly = domyslneSzczegolyTransakcji();
+                t.szczegoly[0].kwota = Math.abs(parseFloat(t.kwota) || 0);
+                t.szczegoly[0].isIncome = t.isIncome !== undefined ? t.isIncome : (parseFloat(t.kwota) >= 0);
+            }
+
+            let sumaTransakcji = 0;
+            t.szczegoly.forEach(sz => {
+                sumaTransakcji += (sz.isIncome ? 1 : -1) * (parseFloat(sz.kwota) || 0);
+            });
+            let sumaStr = sumaTransakcji >= 0 ? `+${sumaTransakcji.toFixed(2)}` : `${sumaTransakcji.toFixed(2)}`;
+            let sumaColor = sumaTransakcji >= 0 ? 'var(--accent-green)' : 'var(--btn-red)';
 
             let tr = document.createElement('tr');
             tr.innerHTML = `
+                <td style="text-align: center;"><button class="btn-add-square" style="background-color: var(--btn-gray); margin: 0 auto; width: 20px; height: 20px; font-size: 14px; line-height: 1;" onclick="toggleTransakcja(${index})">${t.rozwiniecie ? '-' : '+'}</button></td>
                 <td><input type="text" class="ex-input" value="${t.tytul || ''}" oninput="aktualizujTransakcje(${index}, 'tytul', this.value)"></td>
-                <td style="text-align: center;"><button class="btn-sign ${t.isIncome ? 'btn-green' : 'btn-red'}" onclick="zmienTypTransakcji(${index})">${t.isIncome ? '+' : '-'}</button></td>
-                <td><input type="number" step="0.01" min="0" class="ex-input num" value="${k}" oninput="aktualizujTransakcje(${index}, 'kwota', this.value)"></td>
+                <td id="suma-transakcji-${index}" style="text-align: center; font-weight: bold; font-size: 13px; color: ${sumaColor};">${sumaStr}</td>
                 <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunTransakcje(${index})">✖</button></td>
             `;
             tbody.appendChild(tr);
+
+            if (t.rozwiniecie) {
+                t.szczegoly.forEach((sz, szIndex) => {
+                    let trSz = document.createElement('tr');
+                    trSz.style.backgroundColor = 'rgba(0,0,0,0.15)';
+                    trSz.innerHTML = `
+                        <td style="text-align: center; font-size: 16px; padding: 4px 0;">${sz.ikona}</td>
+                        <td style="text-align: right; padding-right: 15px;"><button class="btn-sign ${sz.isIncome ? 'btn-green' : 'btn-red'}" style="width: 22px; height: 22px; font-size: 14px; display: inline-flex;" onclick="zmienTypSzczegolu(${index}, ${szIndex})">${sz.isIncome ? '+' : '-'}</button></td>
+                        <td><input type="number" step="0.01" min="0" class="ex-input num" value="${sz.kwota || 0}" oninput="aktualizujSzczegol(${index}, ${szIndex}, this.value)"></td>
+                        <td></td>
+                    `;
+                    tbody.appendChild(trSz);
+                });
+            }
         });
     }
     function dodajTransakcje() {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
         let maxId = rekord.transakcje.length > 0 ? Math.max(...rekord.transakcje.map(t=>t.id||0)) : 0;
-        rekord.transakcje.push({ id: maxId+1, tytul: 'transakcja', kwota: 0, isIncome: false });
+        rekord.transakcje.push({ id: maxId+1, tytul: 'transakcja', rozwiniecie: true, szczegoly: domyslneSzczegolyTransakcji() });
         zapiszDoBazy(); renderujTransakcje(); odswiezWskaznikiWModalu();
     }
-    function zmienTypTransakcji(index) {
+    function toggleTransakcja(index) {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
-        if (rekord.transakcje[index].isIncome === undefined) {
-            rekord.transakcje[index].isIncome = (parseFloat(rekord.transakcje[index].kwota) >= 0);
-        }
-        rekord.transakcje[index].isIncome = !rekord.transakcje[index].isIncome;
+        rekord.transakcje[index].rozwiniecie = !rekord.transakcje[index].rozwiniecie;
+        renderujTransakcje();
+    }
+    function zmienTypSzczegolu(tIndex, szIndex) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let sz = rekord.transakcje[tIndex].szczegoly[szIndex];
+        sz.isIncome = !sz.isIncome;
         odswiezWskaznikiWModalu();
         renderujTransakcje();
     }
+    function aktualizujSzczegol(tIndex, szIndex, wartosc) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let t = rekord.transakcje[tIndex];
+        t.szczegoly[szIndex].kwota = Math.abs(parseFloat(wartosc) || 0);
+        odswiezWskaznikiWModalu();
+        
+        // Dynamiczna aktualizacja sumy bez przeładowania całego widoku tabeli (zapobiega utracie focusa z inputu)
+        let sumaTransakcji = 0;
+        t.szczegoly.forEach(sz => {
+            sumaTransakcji += (sz.isIncome ? 1 : -1) * (parseFloat(sz.kwota) || 0);
+        });
+        let td = document.getElementById(`suma-transakcji-${tIndex}`);
+        if (td) {
+            td.innerText = sumaTransakcji >= 0 ? `+${sumaTransakcji.toFixed(2)}` : `${sumaTransakcji.toFixed(2)}`;
+            td.style.color = sumaTransakcji >= 0 ? 'var(--accent-green)' : 'var(--btn-red)';
+        }
+    }
     function aktualizujTransakcje(index, pole, wartosc) {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
-        if(pole === 'kwota') rekord.transakcje[index][pole] = Math.abs(parseFloat(wartosc) || 0);
-        else rekord.transakcje[index][pole] = wartosc;
-        odswiezWskaznikiWModalu();
+        rekord.transakcje[index][pole] = wartosc;
+        zapiszDoBazy();
     }
     function usunTransakcje(index) {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);

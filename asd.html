@@ -204,7 +204,7 @@
 
         .modal-content {
             background: var(--bg-container); padding: 20px; border-radius: var(--radius-lg);
-            width: 1200px; max-width: 98vw; max-height: 90vh;
+            width: 1200px; max-width: 98vw; max-height: 95vh;
             display: flex; flex-direction: column;
             box-shadow: 0 15px 35px rgba(0,0,0,0.8); position: relative;
         }
@@ -230,8 +230,8 @@
         .modal-nav-btn:hover:not(:disabled) { background: var(--accent-blue); }
         .modal-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        .modal-body { display: flex; gap: 20px; flex-grow: 1; overflow-y: hidden; }
-        .modal-col { display: flex; flex-direction: column; gap: 10px; height: 100%; overflow: hidden; }
+        .modal-body { display: flex; gap: 20px; flex-grow: 1; }
+        .modal-col { display: flex; flex-direction: column; gap: 10px; }
         
         .modal-section-title { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;}
 
@@ -251,17 +251,14 @@
         }
         .btn-add-square:hover { filter: brightness(1.2); }
 
-        .data-table-container { background: var(--bg-cell); padding: 5px; border-radius: var(--radius-md); flex-grow: 1; overflow-y: auto; }
+        .data-table-container { background: var(--bg-cell); padding: 5px; border-radius: var(--radius-md); flex-grow: 1; overflow-y: auto; height: 620px; }
         .exercises-table { width: 100%; border-collapse: collapse; }
         .exercises-table th { text-align: left; padding: 4px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .exercises-table td { padding: 4px; }
-        .ex-input {
-            background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); width: 100%; height: 24px; border-radius: 4px; outline: none; font-family: inherit; font-size: 11px; padding: 0 5px;
-        }
+        .ex-input { background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); width: 100%; height: 24px; border-radius: 4px; outline: none; font-family: inherit; font-size: 11px; padding: 0 5px; }
         .ex-input.num { text-align: center; }
         .ex-input:focus { border-color: var(--accent-purple); }
         select.ex-input { cursor: pointer; }
-
     </style>
 </head>
 <body>
@@ -489,9 +486,12 @@
                             <table class="exercises-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 50%;">Zadanie</th>
-                                        <th style="width: 35%; text-align: center;">Elo</th>
-                                        <th style="width: 15%;"></th>
+                                        <th style="width: 15%;">Nr</th>
+                                        <th style="width: 25%; text-align: center;">Elo</th>
+                                        <th style="width: 10%;"></th>
+                                        <th style="width: 15%; padding-left: 10px;">Nr</th>
+                                        <th style="width: 25%; text-align: center;">Elo</th>
+                                        <th style="width: 10%;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="modal-szachy-body"></tbody>
@@ -912,38 +912,88 @@
         let tbody = document.getElementById('modal-cwiczenia-body');
         tbody.innerHTML = '';
         if(!rekord.cwiczenia) rekord.cwiczenia = [];
+        
+        // Migracja z układu płaskiego na serie (jeśli użytkownik ma stare ćwiczenia zapisane w starym formacie)
+        if (rekord.cwiczenia.length > 0 && !rekord.cwiczenia[0].cwiczenia) {
+            let oldList = [...rekord.cwiczenia];
+            rekord.cwiczenia = [{ cwiczenia: oldList }];
+            zapiszDoBazy();
+        }
 
-        rekord.cwiczenia.forEach((cw, index) => {
-            let tr = document.createElement('tr');
-            let optionsHTML = `<option value="">-- Wybierz --</option>`;
-            db.base.forEach(bazaCw => {
-                let isSelected = (cw.nazwa === bazaCw.nazwaCwiczenia) ? 'selected' : '';
-                optionsHTML += `<option value="${bazaCw.nazwaCwiczenia}" ${isSelected}>${bazaCw.nazwaCwiczenia}</option>`;
-            });
-
-            tr.innerHTML = `
-                <td><select class="ex-input" onchange="aktualizujCwiczenie(${index}, 'nazwa', this.value)">${optionsHTML}</select></td>
-                <td><input type="number" step="0.5" class="ex-input num" value="${cw.ilosc || 0}" oninput="aktualizujCwiczenie(${index}, 'ilosc', this.value)"></td>
-                <td><input type="number" step="0.5" class="ex-input num" value="${cw.obciazenie || 0}" oninput="aktualizujCwiczenie(${index}, 'obciazenie', this.value)"></td>
-                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunCwiczenie(${index})">✖</button></td>
+        rekord.cwiczenia.forEach((seria, sIndex) => {
+            let volume = seria.cwiczenia.reduce((acc, cw) => acc + ((cw.ilosc || 0) * (cw.obciazenie || 0)), 0);
+            
+            let trSeria = document.createElement('tr');
+            trSeria.style.background = 'rgba(255,255,255,0.05)';
+            trSeria.innerHTML = `
+                <td colspan="4" style="padding: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; font-size: 12px; color: var(--accent-purple);">Seria ${sIndex + 1}</span>
+                        <span id="vol-${sIndex}" style="font-size: 11px; color: var(--text-muted);">Objętość: ${volume}</span>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn-add-square" style="width:20px; height:20px; font-size: 14px; background: var(--btn-gray);" onclick="dodajDoSerii(${sIndex})">+</button>
+                            <button class="btn-add-square" style="width:auto; height:20px; font-size: 10px; background: var(--accent-purple); padding: 0 5px;" onclick="kopiujSerie(${sIndex})">Kopiuj</button>
+                            <button class="btn-del-row" style="width:20px; height:20px; background: var(--btn-red);" onclick="usunSerie(${sIndex})">✖</button>
+                        </div>
+                    </div>
+                </td>
             `;
-            tbody.appendChild(tr);
+            tbody.appendChild(trSeria);
+
+            seria.cwiczenia.forEach((cw, cIndex) => {
+                let optionsHTML = `<option value="">-- Wybierz --</option>`;
+                db.base.forEach(bazaCw => {
+                    let isSelected = (cw.nazwa === bazaCw.nazwaCwiczenia) ? 'selected' : '';
+                    optionsHTML += `<option value="${bazaCw.nazwaCwiczenia}" ${isSelected}>${bazaCw.nazwaCwiczenia}</option>`;
+                });
+
+                let trCw = document.createElement('tr');
+                trCw.innerHTML = `
+                    <td style="padding-left: 10px;"><select class="ex-input" onchange="aktualizujCwiczenie(${sIndex}, ${cIndex}, 'nazwa', this.value)">${optionsHTML}</select></td>
+                    <td><input type="number" step="0.5" class="ex-input num" value="${cw.ilosc || 0}" oninput="aktualizujCwiczenie(${sIndex}, ${cIndex}, 'ilosc', this.value)"></td>
+                    <td><input type="number" step="0.5" class="ex-input num" value="${cw.obciazenie || 0}" oninput="aktualizujCwiczenie(${sIndex}, ${cIndex}, 'obciazenie', this.value)"></td>
+                    <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunCwiczenie(${sIndex}, ${cIndex})">✖</button></td>
+                `;
+                tbody.appendChild(trCw);
+            });
         });
     }
     function dodajCwiczenie() {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
-        rekord.cwiczenia.push({ nazwa: '', ilosc: 0, obciazenie: 0 });
+        rekord.cwiczenia.push({ cwiczenia: [] });
         zapiszDoBazy(); renderujCwiczenia();
     }
-    function aktualizujCwiczenie(index, pole, wartosc) {
+    function dodajDoSerii(sIndex) {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
-        if(pole === 'nazwa') rekord.cwiczenia[index][pole] = wartosc;
-        else rekord.cwiczenia[index][pole] = parseFloat(wartosc) || 0;
+        rekord.cwiczenia[sIndex].cwiczenia.push({ nazwa: '', ilosc: 0, obciazenie: 0 });
+        zapiszDoBazy(); renderujCwiczenia();
+    }
+    function kopiujSerie(sIndex) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        let kopia = JSON.parse(JSON.stringify(rekord.cwiczenia[sIndex]));
+        rekord.cwiczenia.push(kopia);
+        zapiszDoBazy(); renderujCwiczenia();
+    }
+    function usunSerie(sIndex) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        rekord.cwiczenia.splice(sIndex, 1);
+        zapiszDoBazy(); renderujCwiczenia();
+    }
+    function aktualizujCwiczenie(sIndex, cIndex, pole, wartosc) {
+        let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
+        if(pole === 'nazwa') rekord.cwiczenia[sIndex].cwiczenia[cIndex][pole] = wartosc;
+        else {
+            rekord.cwiczenia[sIndex].cwiczenia[cIndex][pole] = parseFloat(wartosc) || 0;
+            
+            let volume = rekord.cwiczenia[sIndex].cwiczenia.reduce((acc, cw) => acc + ((cw.ilosc || 0) * (cw.obciazenie || 0)), 0);
+            let volSpan = document.getElementById(`vol-${sIndex}`);
+            if(volSpan) volSpan.innerText = `Objętość: ${volume}`;
+        }
         zapiszDoBazy();
     }
-    function usunCwiczenie(index) {
+    function usunCwiczenie(sIndex, cIndex) {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
-        rekord.cwiczenia.splice(index, 1);
+        rekord.cwiczenia[sIndex].cwiczenia.splice(cIndex, 1);
         zapiszDoBazy(); renderujCwiczenia();
     }
 
@@ -988,17 +1038,47 @@
             tbody.appendChild(tr);
 
             if (t.rozwiniecie) {
-                t.szczegoly.forEach((sz, szIndex) => {
-                    let trSz = document.createElement('tr');
-                    trSz.style.backgroundColor = 'rgba(0,0,0,0.15)';
-                    trSz.innerHTML = `
-                        <td style="text-align: center; font-size: 16px; padding: 4px 0;">${sz.ikona}</td>
-                        <td style="text-align: right; padding-right: 15px;"><button class="btn-sign ${sz.isIncome ? 'btn-green' : 'btn-red'}" style="width: 22px; height: 22px; font-size: 14px; display: inline-flex;" onclick="zmienTypSzczegolu(${index}, ${szIndex})">${sz.isIncome ? '+' : '-'}</button></td>
-                        <td><input type="number" step="0.01" min="0" class="ex-input num" value="${sz.kwota || 0}" oninput="aktualizujSzczegol(${index}, ${szIndex}, this.value)"></td>
-                        <td></td>
-                    `;
-                    tbody.appendChild(trSz);
+                let trSz = document.createElement('tr');
+                trSz.style.backgroundColor = 'rgba(0,0,0,0.15)';
+                
+                let td = document.createElement('td');
+                td.colSpan = 4;
+                td.style.padding = "10px";
+                
+                let gridHTML = `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+                let parowaniaDoRenderu = [ [0, 5], [2, 3], [4, 1] ]; 
+                // Indeksy w tablicy (starej): 0:💵, 1:💧, 2:🍞, 3:🥤, 4:🍫, 5:🪥
+                // Ułożenie nowych wierszy z blokami:
+                // R1: (💵 0) | (🪥 5)
+                // R2: (💧 2) | (🍞 3)  - zmapowałem indeksy z domyślnego tworzenia z bazy (0:💵, 1:💧, 2:🍞, 3:🥤, 4:🍫, 5:🪥)
+                // By nie psuć starych wpisów indeksy to: 0(💵) 5(🪥), 1(💧) 2(🍞), 3(🥤) 4(🍫).
+                parowaniaDoRenderu = [ [0, 5], [1, 2], [3, 4] ];
+
+                parowaniaDoRenderu.forEach(para => {
+                    let lIdx = para[0];
+                    let pIdx = para[1];
+                    let szL = t.szczegoly[lIdx];
+                    let szP = t.szczegoly[pIdx];
+                    
+                    let blockL = `<div style="display: flex; flex: 1; align-items: center; gap: 5px;">
+                        <span style="font-size:16px;">${szL.ikona}</span>
+                        <button class="btn-sign ${szL.isIncome?'btn-green':'btn-red'}" style="width:20px;height:20px;font-size:12px;margin:0;" onclick="zmienTypSzczegolu(${index}, ${lIdx})">${szL.isIncome?'+':'-'}</button>
+                        <input type="number" step="0.01" min="0" class="ex-input num" style="flex:1" value="${szL.kwota||0}" oninput="aktualizujSzczegol(${index}, ${lIdx}, this.value)">
+                    </div>`;
+                    
+                    let blockP = `<div style="display: flex; flex: 1; align-items: center; gap: 5px; padding-left: 10px; border-left: 1px solid rgba(255,255,255,0.1);">
+                        <span style="font-size:16px;">${szP.ikona}</span>
+                        <button class="btn-sign ${szP.isIncome?'btn-green':'btn-red'}" style="width:20px;height:20px;font-size:12px;margin:0;" onclick="zmienTypSzczegolu(${index}, ${pIdx})">${szP.isIncome?'+':'-'}</button>
+                        <input type="number" step="0.01" min="0" class="ex-input num" style="flex:1" value="${szP.kwota||0}" oninput="aktualizujSzczegol(${index}, ${pIdx}, this.value)">
+                    </div>`;
+                    
+                    gridHTML += `<div style="display: flex; justify-content: space-between;">${blockL}${blockP}</div>`;
                 });
+                gridHTML += `</div>`;
+                
+                td.innerHTML = gridHTML;
+                trSz.appendChild(td);
+                tbody.appendChild(trSz);
             }
         });
     }
@@ -1055,15 +1135,29 @@
         tbody.innerHTML = '';
         if(!rekord.chessList) rekord.chessList = [];
 
-        rekord.chessList.forEach((ch, index) => {
+        for (let i = 0; i < rekord.chessList.length; i += 2) {
             let tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-size: 11px; color: var(--text-main);">Zadanie ${index + 1}</td>
-                <td><input type="number" class="ex-input num" value="${ch.elo || 0}" oninput="aktualizujSzachy(${index}, this.value)"></td>
-                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunSzachy(${index})">✖</button></td>
+            
+            let chL = rekord.chessList[i];
+            let tdL = `
+                <td style="font-size: 11px; color: var(--text-main);">${i + 1}.</td>
+                <td><input type="number" class="ex-input num" value="${chL.elo || 0}" oninput="aktualizujSzachy(${i}, this.value)"></td>
+                <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunSzachy(${i})">✖</button></td>
             `;
+            
+            let tdP = `<td colspan="3"></td>`;
+            if (i + 1 < rekord.chessList.length) {
+                let chP = rekord.chessList[i+1];
+                tdP = `
+                    <td style="font-size: 11px; color: var(--text-main); padding-left:10px; border-left: 1px solid rgba(255,255,255,0.1);">${i + 2}.</td>
+                    <td><input type="number" class="ex-input num" value="${chP.elo || 0}" oninput="aktualizujSzachy(${i+1}, this.value)"></td>
+                    <td style="text-align: center;"><button class="btn-del-row" style="margin: 0 auto;" onclick="usunSzachy(${i+1})">✖</button></td>
+                `;
+            }
+            
+            tr.innerHTML = tdL + tdP;
             tbody.appendChild(tr);
-        });
+        }
     }
     function dodajSzachy() {
         let rekord = db.dni.find(d => d.id === aktualnieEdytowanyDzienId);
